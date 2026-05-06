@@ -13,7 +13,7 @@ npm run dev
 
 ```bash
 YANDEX_FORM_URL=https://forms.yandex.ru/u/your-form/
-NEXT_PUBLIC_YANDEX_METRIKA_ID=12345678
+NEXT_PUBLIC_YANDEX_METRIKA_ID=109088866
 ```
 
 ## Маршруты
