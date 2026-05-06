@@ -16,6 +16,12 @@ type AuditResponse = {
   result: AuditResult;
 };
 
+declare global {
+  interface Window {
+    ym?: (counterId: string, action: "reachGoal", goalName: string) => void;
+  }
+}
+
 const initialForm = {
   productUrl: "",
   marketplace: "Ozon" as Marketplace,
@@ -33,6 +39,7 @@ export function AuditForm({ contactFormUrl }: { contactFormUrl: string }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    reachYandexGoal("audit_submit");
     setIsLoading(true);
     setError("");
     setShowContactButton(false);
@@ -51,6 +58,7 @@ export function AuditForm({ contactFormUrl }: { contactFormUrl: string }) {
       }
 
       setResult(data.result);
+      reachYandexGoal("audit_result");
     } catch (requestError) {
       setResult(null);
       setError(
@@ -197,7 +205,10 @@ export function AuditForm({ contactFormUrl }: { contactFormUrl: string }) {
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() => setShowContactButton(true)}
+                onClick={() => {
+                  reachYandexGoal("full_report_click");
+                  setShowContactButton(true);
+                }}
                 className="rounded-md border border-[var(--accent)] px-5 py-3 font-semibold text-[var(--accent)] transition hover:bg-[#eef7f2]"
               >
                 Открыть полный отчет за 199 ₽
@@ -227,6 +238,20 @@ export function AuditForm({ contactFormUrl }: { contactFormUrl: string }) {
       </section>
     </div>
   );
+}
+
+function reachYandexGoal(goalName: string) {
+  const counterId = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
+
+  if (!counterId || typeof window === "undefined" || typeof window.ym !== "function") {
+    return;
+  }
+
+  try {
+    window.ym(counterId, "reachGoal", goalName);
+  } catch {
+    // Analytics must not block the audit flow.
+  }
 }
 
 function AuditBlock({
