@@ -10,11 +10,11 @@ export default function AuditPage() {
           Бесплатный мини-аудит
         </p>
         <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">
-          Проверьте карточку Ozon или Wildberries
+          Проверьте или улучшите карточку Ozon/WB с помощью AI
         </h1>
         <p className="mt-4 leading-7 text-[var(--muted)]">
-          Заполните обязательные поля и получите mock-отчет для MVP. Позже сюда можно
-          подключить GigaChat или другой AI-провайдер.
+          Вставьте ссылку на существующую карточку или описание товара — получите аудит,
+          SEO-заголовок, улучшенное описание, идеи для инфографики и рекомендации.
         </p>
       </div>
       <AuditForm contactFormUrl={contactFormUrl} />
