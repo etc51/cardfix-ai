@@ -14,8 +14,9 @@ npm run dev
 ```bash
 YANDEX_FORM_URL=https://forms.yandex.ru/u/your-form/
 NEXT_PUBLIC_YANDEX_METRIKA_ID=109088866
-GIGACHAT_AUTH_KEY=your-gigachat-auth-key
+GIGACHAT_AUTH_KEY=
 GIGACHAT_MODEL=GigaChat-Max
+GIGACHAT_CA_CERT=
 ```
 
 ## Маршруты
