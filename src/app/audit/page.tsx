@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuditForm } from "@/components/audit-form";
 
 export default function AuditPage() {
@@ -14,10 +15,12 @@ export default function AuditPage() {
         </h1>
         <p className="mt-4 leading-7 text-[var(--muted)]">
           Выберите режим: проверить уже опубликованную карточку или создать/улучшить
-          карточку товара с нуля.
+          карточку товара.
         </p>
       </div>
-      <AuditForm contactFormUrl={contactFormUrl} />
+      <Suspense fallback={null}>
+        <AuditForm contactFormUrl={contactFormUrl} />
+      </Suspense>
     </main>
   );
 }

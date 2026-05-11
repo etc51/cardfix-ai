@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 type Marketplace = "Ozon" | "Wildberries";
 type AuditMode = "audit" | "create";
@@ -55,6 +56,7 @@ const initialCreateForm = {
 };
 
 export function AuditForm({ contactFormUrl }: { contactFormUrl: string }) {
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<AuditMode>("audit");
   const [auditForm, setAuditForm] = useState(initialAuditForm);
   const [createForm, setCreateForm] = useState(initialCreateForm);
@@ -63,11 +65,26 @@ export function AuditForm({ contactFormUrl }: { contactFormUrl: string }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    const modeFromUrl = searchParams.get("mode");
+
+    if (modeFromUrl === "create") {
+      setMode("create");
+      reachYandexGoal("mode_create_selected");
+    }
+
+    if (modeFromUrl === "audit") {
+      setMode("audit");
+      reachYandexGoal("mode_audit_selected");
+    }
+  }, [searchParams]);
+
   function switchMode(nextMode: AuditMode) {
     setMode(nextMode);
     setResult(null);
     setError("");
     setShowContactButton(false);
+    reachYandexGoal(nextMode === "audit" ? "mode_audit_selected" : "mode_create_selected");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -109,7 +126,7 @@ export function AuditForm({ contactFormUrl }: { contactFormUrl: string }) {
       <div className="grid gap-3 rounded-lg border border-[var(--line)] bg-white p-2 sm:grid-cols-2">
         <ModeButton
           isActive={mode === "audit"}
-          title="Проверить существующую карточку"
+          title="Проверить карточку"
           onClick={() => switchMode("audit")}
         />
         <ModeButton
@@ -122,7 +139,7 @@ export function AuditForm({ contactFormUrl }: { contactFormUrl: string }) {
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <form onSubmit={handleSubmit} className="rounded-lg border border-[var(--line)] bg-white p-5">
           <h2 className="mb-5 text-xl font-semibold">
-            {mode === "audit" ? "Проверить существующую карточку" : "Создать / улучшить карточку"}
+            {mode === "audit" ? "Проверить карточку" : "Создать / улучшить карточку"}
           </h2>
 
           {mode === "audit" ? (
@@ -447,7 +464,7 @@ function Paywall({
 }) {
   return (
     <div className="mt-6 rounded-lg border border-[var(--line)] bg-[#f4f6f1] p-5">
-      <h3 className="text-xl font-semibold">Полный отчет за 199 ₽</h3>
+      <h3 className="text-xl font-semibold">Открыть полный отчет за 199 ₽</h3>
       <p className="mt-3 leading-7 text-[var(--muted)]">
         В полном отчете будут SEO-ключи, 3–5 вариантов заголовка, улучшенное описание,
         анализ отзывов, ТЗ для инфографики, ответы на отзывы и план на 7 дней.

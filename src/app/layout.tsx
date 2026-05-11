@@ -16,12 +16,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CardFix AI",
-  description: "AI-аудит карточек Ozon и Wildberries для роста продаж.",
+  description:
+    "AI-сервис для проверки, создания и улучшения карточек Ozon и Wildberries.",
 };
 
 const navItems = [
   { href: "/", label: "Главная" },
-  { href: "/audit", label: "AI-аудит" },
+  { href: "/audit?mode=audit", label: "Проверить карточку" },
+  { href: "/audit?mode=create", label: "Создать карточку" },
   { href: "/blog", label: "Блог" },
 ];
 
@@ -89,9 +91,12 @@ export default function RootLayout({
         {children}
         <footer className="border-t border-[var(--line)]">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-8 text-sm text-[var(--muted)] sm:flex-row sm:items-center sm:justify-between">
-            <p>CardFix AI помогает находить слабые места в карточках товаров.</p>
+            <p>
+              CardFix AI — AI-сервис для проверки, создания и улучшения карточек Ozon и
+              Wildberries.
+            </p>
             <Link href="/audit" className="font-medium text-[var(--accent)]">
-              Получить бесплатный аудит
+              Выбрать режим
             </Link>
           </div>
         </footer>
