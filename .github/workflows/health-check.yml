@@ -1,0 +1,27 @@
+name: Health Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: "Site URL to check"
+        default: "https://cardfix-ai.vercel.app"
+        required: true
+        type: string
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run health check
+        env:
+          SITE_URL: ${{ inputs.site_url }}
+        run: npm run health:local

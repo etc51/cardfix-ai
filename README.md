@@ -27,6 +27,7 @@ GIGACHAT_CA_CERT=
 - `/thanks` - страница благодарности
 - `/api/audit` - API аудита и улучшения карточек через GigaChat
 - `/api/gigachat-health` - безопасная диагностика подключения GigaChat
+- `/api/system-health` - общая проверка env, GigaChat, audit API, формы и Метрики
 
 ## GigaChat на Vercel
 
@@ -54,3 +55,15 @@ GIGACHAT_CA_CERT=
 - `ok: true`
 
 Если `chat.ok: true`, то `/api/audit` использует тот же GigaChat client и должен работать.
+
+## Проверка после deploy
+
+Запустите:
+
+```bash
+SITE_URL=https://cardfix-ai.vercel.app npm run health:local
+```
+
+Скрипт вызывает `/api/system-health`, печатает результат по разделам и завершает процесс с кодом `1`, если `ok: false`.
+
+Ручной GitHub Actions workflow: `.github/workflows/health-check.yml`. Его можно запустить через `workflow_dispatch` и передать `SITE_URL`, например `https://cardfix-ai.vercel.app`.
