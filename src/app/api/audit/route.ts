@@ -1,6 +1,5 @@
-import { Agent, request as httpsRequest } from "node:https";
-import { rootCertificates } from "node:tls";
 import { NextResponse } from "next/server";
+import { getSafeGigaChatError, requestGigaChatJson } from "@/lib/gigachat-client";
 
 type AuditRequest = {
   mode?: "audit";
@@ -23,20 +22,7 @@ type CreateRequest = {
 
 type AuditApiRequest = AuditRequest | CreateRequest;
 
-type GigaChatMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
-};
-
-type GigaChatRequestOptions = {
-  body?: string;
-  headers?: Record<string, string>;
-  method: "POST";
-};
-
 const marketplaces = new Set(["Ozon", "Wildberries"]);
-const authUrl = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
-const chatUrl = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions";
 const fallbackError =
   "AI-сервис временно недоступен. Попробуйте повторить запрос позже или оставьте контакт для полного отчета.";
 
@@ -75,8 +61,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ result });
   } catch (error) {
-    console.error("GigaChat request failed:", getSafeErrorMessage(error));
-    return NextResponse.json({ error: fallbackError }, { status: 503 });
+    const safeError = getSafeGigaChatError(error);
+    console.error("GigaChat audit request failed:", safeError.type, safeError.code || "");
+    return NextResponse.json(
+      { code: safeError.code, error: fallbackError, errorType: safeError.type },
+      { status: 503 },
+    );
   }
 }
 
@@ -168,172 +158,6 @@ function buildCreatePrompt(body: CreateRequest) {
     `Целевая аудитория: ${body.audience?.trim() || "не указана"}`,
     `Отзывы или частые вопросы: ${limitText(body.questions, 8000) || "не указаны"}`,
   ].join("\n");
-}
-
-async function requestGigaChatJson(prompt: string) {
-  const accessToken = await getGigaChatAccessToken();
-  const model = process.env.GIGACHAT_MODEL || "GigaChat-Max";
-  const messages: GigaChatMessage[] = [
-    {
-      role: "system",
-      content:
-        "Ты возвращаешь только валидный JSON. Не используй markdown, кодовые блоки и текст вне JSON.",
-    },
-    { role: "user", content: prompt },
-  ];
-
-  const data = await requestGigaChatEndpoint<{
-    choices?: Array<{ message?: { content?: unknown } }>;
-  }>(chatUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.3,
-      max_tokens: 1800,
-    }),
-  });
-
-  const content = data?.choices?.[0]?.message?.content;
-
-  if (typeof content !== "string") {
-    throw new Error("GigaChat response does not contain message content");
-  }
-
-  return parseJsonObject(content);
-}
-
-async function getGigaChatAccessToken() {
-  const authKey = process.env.GIGACHAT_AUTH_KEY;
-
-  if (!authKey) {
-    throw new Error("GIGACHAT_AUTH_KEY is not configured");
-  }
-
-  const data = await requestGigaChatEndpoint<{ access_token?: unknown }>(authUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${authKey}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-      RqUID: crypto.randomUUID(),
-    },
-    body: new URLSearchParams({ scope: "GIGACHAT_API_PERS" }).toString(),
-  });
-
-  if (typeof data?.access_token !== "string") {
-    throw new Error("GigaChat auth response does not contain access_token");
-  }
-
-  return data.access_token;
-}
-
-function requestGigaChatEndpoint<T>(url: string, options: GigaChatRequestOptions) {
-  return new Promise<T>((resolve, reject) => {
-    const body = options.body || "";
-    const parsedUrl = new URL(url);
-    const request = httpsRequest(
-      {
-        agent: getGigaChatHttpsAgent(),
-        headers: {
-          ...options.headers,
-          "Content-Length": String(Buffer.byteLength(body)),
-        },
-        hostname: parsedUrl.hostname,
-        method: options.method,
-        path: `${parsedUrl.pathname}${parsedUrl.search}`,
-        port: parsedUrl.port || 443,
-        protocol: parsedUrl.protocol,
-        timeout: 25000,
-      },
-      (response) => {
-        const chunks: Buffer[] = [];
-
-        response.on("data", (chunk: Buffer) => chunks.push(chunk));
-        response.on("end", () => {
-          const responseBody = Buffer.concat(chunks).toString("utf8");
-          const statusCode = response.statusCode || 0;
-
-          if (statusCode < 200 || statusCode >= 300) {
-            reject(new Error(`GigaChat HTTP ${statusCode}`));
-            return;
-          }
-
-          try {
-            resolve(JSON.parse(responseBody) as T);
-          } catch {
-            reject(new Error("GigaChat returned invalid JSON"));
-          }
-        });
-      },
-    );
-
-    request.on("timeout", () => {
-      request.destroy(new Error("GigaChat request timeout"));
-    });
-    request.on("error", reject);
-    request.end(body);
-  });
-}
-
-function getGigaChatHttpsAgent() {
-  const caCert = normalizeCertificate(process.env.GIGACHAT_CA_CERT);
-
-  return new Agent({
-    ca: caCert ? [...rootCertificates, caCert] : rootCertificates,
-    keepAlive: true,
-    rejectUnauthorized: true,
-  });
-}
-
-function normalizeCertificate(value: string | undefined) {
-  const certificate = value?.trim();
-
-  if (!certificate) {
-    return "";
-  }
-
-  const pem = certificate.replace(/\\n/g, "\n");
-
-  if (pem.includes("-----BEGIN CERTIFICATE-----")) {
-    return pem;
-  }
-
-  const decoded = Buffer.from(certificate, "base64").toString("utf8").trim();
-
-  return decoded.includes("-----BEGIN CERTIFICATE-----") ? decoded : pem;
-}
-
-function getSafeErrorMessage(error: unknown) {
-  if (!(error instanceof Error)) {
-    return "unknown error";
-  }
-
-  const errorWithCode = error as Error & { code?: unknown };
-  const code = typeof errorWithCode.code === "string" ? ` code=${errorWithCode.code}` : "";
-
-  return `${error.name}${code}: ${error.message}`;
-}
-
-function parseJsonObject(value: string) {
-  const trimmed = value.trim();
-
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-
-    if (start === -1 || end === -1 || end <= start) {
-      throw new Error("GigaChat response is not valid JSON");
-    }
-
-    return JSON.parse(trimmed.slice(start, end + 1));
-  }
 }
 
 function normalizeScore(value: unknown) {
