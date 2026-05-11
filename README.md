@@ -14,6 +14,8 @@ npm run dev
 ```bash
 YANDEX_FORM_URL=https://forms.yandex.ru/u/your-form/
 NEXT_PUBLIC_YANDEX_METRIKA_ID=109088866
+GIGACHAT_AUTH_KEY=your-gigachat-auth-key
+GIGACHAT_MODEL=GigaChat-Max
 ```
 
 ## Маршруты
@@ -22,4 +24,4 @@ NEXT_PUBLIC_YANDEX_METRIKA_ID=109088866
 - `/audit` - форма бесплатного аудита
 - `/blog` - список статей
 - `/thanks` - страница благодарности
-- `/api/audit` - mock API аудита
+- `/api/audit` - API аудита и улучшения карточек через GigaChat

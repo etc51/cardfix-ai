@@ -21,7 +21,16 @@ type CreateRequest = {
 
 type AuditApiRequest = AuditRequest | CreateRequest;
 
+type GigaChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
 const marketplaces = new Set(["Ozon", "Wildberries"]);
+const authUrl = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
+const chatUrl = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions";
+const fallbackError =
+  "AI-сервис временно недоступен. Попробуйте повторить запрос позже или оставьте контакт для полного отчета.";
 
 export async function POST(request: Request) {
   let body: AuditApiRequest;
@@ -41,11 +50,24 @@ export async function POST(request: Request) {
     );
   }
 
-  if (mode === "create") {
-    return createCardResponse(body as CreateRequest);
+  const validationError =
+    mode === "create" ? validateCreateRequest(body as CreateRequest) : validateAuditRequest(body as AuditRequest);
+
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
-  return auditCardResponse(body as AuditRequest);
+  try {
+    const result =
+      mode === "create"
+        ? await generateCreateResult(body as CreateRequest)
+        : await generateAuditResult(body as AuditRequest);
+
+    return NextResponse.json({ result });
+  } catch (error) {
+    console.error("GigaChat request failed", error);
+    return NextResponse.json({ error: fallbackError }, { status: 503 });
+  }
 }
 
 export function GET() {
@@ -55,102 +77,205 @@ export function GET() {
   );
 }
 
-function auditCardResponse(body: AuditRequest) {
+function validateAuditRequest(body: AuditRequest) {
   if (!body.productUrl) {
-    return NextResponse.json(
-      { error: "Укажите ссылку на карточку и маркетплейс" },
-      { status: 400 },
-    );
+    return "Укажите ссылку на карточку и маркетплейс";
   }
 
   if (!isValidUrl(body.productUrl)) {
-    return NextResponse.json({ error: "Укажите корректную ссылку на карточку" }, { status: 400 });
+    return "Укажите корректную ссылку на карточку";
   }
 
-  const marketplace = body.marketplace || "Ozon";
-  const goal = body.goal?.trim() || "рост конверсии";
-  const score = body.description || body.reviews ? 78 : 64;
-
-  return NextResponse.json({
-    result: {
-      mode: "audit",
-      score,
-      summary: `Карточка на ${marketplace} выглядит рабочей, но недобирает доверие и поисковый трафик. Главный фокус для следующей итерации: ${goal}.`,
-      errors: [
-        "В заголовке не хватает конкретного поискового запроса и ключевой характеристики товара.",
-        "Описание слабо объясняет выгоду покупателя и не закрывает основные возражения.",
-        "Отзывы и боли покупателей не превращены в улучшения фото, инфографики и текста.",
-      ],
-      seoTitle:
-        marketplace === "Ozon"
-          ? "Товар для дома с улучшенной комплектацией, надежный вариант для ежедневного использования"
-          : "Товар для дома, практичная модель с надежной комплектацией для ежедневного использования",
-      salesBlockers: [
-        "Покупателю сложно быстро понять, почему этот товар лучше соседних предложений.",
-        "Нет явного ответа на вопросы о размере, комплектации, уходе или сценарии использования.",
-        "Первый экран карточки не показывает главный результат для покупателя.",
-      ],
-      recommendations: [
-        "Перепишите первый экран карточки вокруг главного сценария покупки и результата для клиента.",
-        "Добавьте в описание 3–5 конкретных преимуществ вместо общих формулировок.",
-        "Соберите частые вопросы из отзывов и вынесите ответы в фото, характеристики и текст.",
-      ],
-      firstFixes: [
-        "Сначала обновите SEO-заголовок и первые 2 изображения.",
-        "Затем добавьте блок с ответами на частые возражения.",
-        "После этого проверьте характеристики на полноту и точные формулировки.",
-      ],
-    },
-  });
+  return "";
 }
 
-function createCardResponse(body: CreateRequest) {
+function validateCreateRequest(body: CreateRequest) {
   if (!body.category || !body.productDescription) {
-    return NextResponse.json(
-      { error: "Укажите маркетплейс, категорию и название или краткое описание товара" },
-      { status: 400 },
-    );
+    return "Укажите маркетплейс, категорию и название или краткое описание товара";
   }
 
-  const marketplace = body.marketplace || "Ozon";
-  const category = body.category.trim();
-  const product = body.productDescription.trim();
-  const audience = body.audience?.trim() || "покупателей, которые выбирают практичное решение";
+  return "";
+}
 
-  return NextResponse.json({
-    result: {
-      mode: "create",
-      seoTitle: `${category}: ${product} для ${audience} — надежный выбор на ${marketplace}`,
-      improvedDescription: `Этот товар помогает быстро решить повседневную задачу без лишних сложностей. В карточке стоит показать ключевую пользу, понятную комплектацию, сценарии использования и доказательства надежности: материалы, размеры, уход, гарантию и ответы на частые вопросы.`,
-      keyPhrases: [
-        `${category} для дома`,
-        `${category} ${marketplace}`,
-        "практичный товар на каждый день",
-        "подарок для ежедневного использования",
-        "надежная комплектация товара",
-      ],
-      infographicIdeas: [
-        "Первый слайд: главный результат для покупателя и 3 коротких преимущества.",
-        "Сравнение: что входит в комплект и чем товар отличается от обычных аналогов.",
-        "Сценарии применения: где, кому и в каких ситуациях товар особенно полезен.",
-      ],
-      objections: [
-        "Подойдет ли размер, материал или комплектация под мою задачу.",
-        "Будет ли товар выглядеть так же, как на фото.",
-        "Насколько товар надежен при регулярном использовании.",
-      ],
-      characteristics: [
-        "Точные размеры, вес, материал и состав комплекта.",
-        "Правила ухода, ограничения по использованию и гарантийные условия.",
-        "Совместимость, сезонность, назначение и страна производства, если это важно для категории.",
-      ],
-      refinementPlan: [
-        "Собрать SEO-ядро и выбрать 5–7 главных ключевых фраз.",
-        "Написать заголовок, описание и характеристики под сценарий покупки.",
-        "Подготовить ТЗ для 5 слайдов инфографики и добавить ответы на возражения.",
-      ],
+async function generateAuditResult(body: AuditRequest) {
+  const prompt = buildAuditPrompt(body);
+  const rawResult = await requestGigaChatJson(prompt);
+
+  return {
+    mode: "audit" as const,
+    score: normalizeScore(rawResult.score),
+    summary: normalizeString(rawResult.summary),
+    mainProblems: normalizeStringArray(rawResult.mainProblems, 3),
+    seoTitle: normalizeString(rawResult.seoTitle),
+    blockers: normalizeStringArray(rawResult.blockers, 3),
+    recommendations: normalizeStringArray(rawResult.recommendations, 3),
+    firstFixes: normalizeStringArray(rawResult.firstFixes, 3),
+  };
+}
+
+async function generateCreateResult(body: CreateRequest) {
+  const prompt = buildCreatePrompt(body);
+  const rawResult = await requestGigaChatJson(prompt);
+
+  return {
+    mode: "create" as const,
+    seoTitle: normalizeString(rawResult.seoTitle),
+    improvedDescription: normalizeString(rawResult.improvedDescription),
+    keywords: normalizeStringArray(rawResult.keywords, 5),
+    infographicIdeas: normalizeStringArray(rawResult.infographicIdeas, 3),
+    objections: normalizeStringArray(rawResult.objections, 3),
+    characteristicsIdeas: normalizeStringArray(rawResult.characteristicsIdeas, 3),
+    improvementPlan: normalizeStringArray(rawResult.improvementPlan, 3),
+  };
+}
+
+function buildAuditPrompt(body: AuditRequest) {
+  return [
+    "Ты эксперт по карточкам товаров Ozon и Wildberries.",
+    "Проведи аудит существующей карточки. Ответь строго JSON без markdown и пояснений.",
+    "Схема JSON:",
+    '{"score":75,"summary":"...","mainProblems":["...","...","..."],"seoTitle":"...","blockers":["...","...","..."],"recommendations":["...","...","..."],"firstFixes":["...","...","..."]}',
+    "",
+    `Маркетплейс: ${body.marketplace}`,
+    `Ссылка на карточку: ${body.productUrl}`,
+    `Цель: ${body.goal?.trim() || "улучшить продажи и SEO"}`,
+    `Описание карточки: ${limitText(body.description, 4000) || "не указано"}`,
+    `Отзывы: ${limitText(body.reviews, 8000) || "не указаны"}`,
+  ].join("\n");
+}
+
+function buildCreatePrompt(body: CreateRequest) {
+  return [
+    "Ты эксперт по созданию и улучшению карточек товаров Ozon и Wildberries.",
+    "Подготовь улучшение карточки. Ответь строго JSON без markdown и пояснений.",
+    "Схема JSON:",
+    '{"seoTitle":"...","improvedDescription":"...","keywords":["...","...","...","...","..."],"infographicIdeas":["...","...","..."],"objections":["...","...","..."],"characteristicsIdeas":["...","...","..."],"improvementPlan":["...","...","..."]}',
+    "",
+    `Маркетплейс: ${body.marketplace}`,
+    `Категория товара: ${body.category}`,
+    `Название или краткое описание товара: ${limitText(body.productDescription, 4000)}`,
+    `Преимущества товара: ${limitText(body.benefits, 4000) || "не указаны"}`,
+    `Целевая аудитория: ${body.audience?.trim() || "не указана"}`,
+    `Отзывы или частые вопросы: ${limitText(body.questions, 8000) || "не указаны"}`,
+  ].join("\n");
+}
+
+async function requestGigaChatJson(prompt: string) {
+  const accessToken = await getGigaChatAccessToken();
+  const model = process.env.GIGACHAT_MODEL || "GigaChat-Max";
+  const messages: GigaChatMessage[] = [
+    {
+      role: "system",
+      content:
+        "Ты возвращаешь только валидный JSON. Не используй markdown, кодовые блоки и текст вне JSON.",
     },
+    { role: "user", content: prompt },
+  ];
+
+  const response = await fetch(chatUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.3,
+      max_tokens: 1800,
+    }),
   });
+
+  if (!response.ok) {
+    throw new Error(`GigaChat completion failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content;
+
+  if (typeof content !== "string") {
+    throw new Error("GigaChat response does not contain message content");
+  }
+
+  return parseJsonObject(content);
+}
+
+async function getGigaChatAccessToken() {
+  const authKey = process.env.GIGACHAT_AUTH_KEY;
+
+  if (!authKey) {
+    throw new Error("GIGACHAT_AUTH_KEY is not configured");
+  }
+
+  const response = await fetch(authUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${authKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      RqUID: crypto.randomUUID(),
+    },
+    body: new URLSearchParams({ scope: "GIGACHAT_API_PERS" }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`GigaChat auth failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (typeof data?.access_token !== "string") {
+    throw new Error("GigaChat auth response does not contain access_token");
+  }
+
+  return data.access_token;
+}
+
+function parseJsonObject(value: string) {
+  const trimmed = value.trim();
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+
+    if (start === -1 || end === -1 || end <= start) {
+      throw new Error("GigaChat response is not valid JSON");
+    }
+
+    return JSON.parse(trimmed.slice(start, end + 1));
+  }
+}
+
+function normalizeScore(value: unknown) {
+  const score = Number(value);
+
+  if (!Number.isFinite(score)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function normalizeString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeStringArray(value: unknown, fallbackLength: number) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeString).filter(Boolean);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return [value.trim()];
+  }
+
+  return Array.from({ length: fallbackLength }, () => "");
+}
+
+function limitText(value: string | undefined, maxLength: number) {
+  return (value || "").trim().slice(0, maxLength);
 }
 
 function isValidUrl(value: string) {

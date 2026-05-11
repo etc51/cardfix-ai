@@ -10,9 +10,9 @@ type AuditResult = {
   mode: "audit";
   score: number;
   summary: string;
-  errors: string[];
+  mainProblems: string[];
   seoTitle: string;
-  salesBlockers: string[];
+  blockers: string[];
   recommendations: string[];
   firstFixes: string[];
 };
@@ -21,11 +21,11 @@ type CreateResult = {
   mode: "create";
   seoTitle: string;
   improvedDescription: string;
-  keyPhrases: string[];
+  keywords: string[];
   infographicIdeas: string[];
   objections: string[];
-  characteristics: string[];
-  refinementPlan: string[];
+  characteristicsIdeas: string[];
+  improvementPlan: string[];
 };
 
 type AuditResponse = {
@@ -414,11 +414,11 @@ function AuditResultView({ result }: { result: AuditResult }) {
         <AuditBlock title="Краткий вывод">
           <p className="leading-7 text-[var(--muted)]">{result.summary}</p>
         </AuditBlock>
-        <ListBlock title="Главные ошибки" items={result.errors} markerClassName="bg-red-500" />
+        <ListBlock title="Главные ошибки" items={result.mainProblems} markerClassName="bg-red-500" />
         <AuditBlock title="Новый SEO-заголовок">
           <p className="rounded-md bg-[#f4f6f1] p-3 font-medium leading-7">{result.seoTitle}</p>
         </AuditBlock>
-        <ListBlock title="Что мешает продаже" items={result.salesBlockers} markerClassName="bg-red-500" />
+        <ListBlock title="Что мешает продаже" items={result.blockers} markerClassName="bg-red-500" />
         <ListBlock title="Рекомендации" items={result.recommendations} />
         <ListBlock title="Что исправить первым" items={result.firstFixes} />
       </div>
@@ -443,11 +443,11 @@ function CreateResultView({ result }: { result: CreateResult }) {
         <AuditBlock title="Улучшенное описание">
           <p className="leading-7 text-[var(--muted)]">{result.improvedDescription}</p>
         </AuditBlock>
-        <ListBlock title="5 ключевых фраз" items={result.keyPhrases} />
+        <ListBlock title="5 ключевых фраз" items={result.keywords} />
         <ListBlock title="3 идеи для инфографики" items={result.infographicIdeas} />
         <ListBlock title="Возражения покупателей" items={result.objections} markerClassName="bg-red-500" />
-        <ListBlock title="Что добавить в характеристики" items={result.characteristics} />
-        <ListBlock title="План доработки карточки" items={result.refinementPlan} />
+        <ListBlock title="Что добавить в характеристики" items={result.characteristicsIdeas} />
+        <ListBlock title="План доработки карточки" items={result.improvementPlan} />
       </div>
     </>
   );
